@@ -11,4 +11,6 @@ bin           = @["main"]
 # Dependencies
 
 requires "nim >= 0.13.0"
+requires "opengl >= 1.0.1"
+requires "sdl2 >= 1.1"
 
