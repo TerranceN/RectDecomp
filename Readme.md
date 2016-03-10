@@ -23,15 +23,18 @@ Viewer
 
 This also includes a model viewer. It's currently configured to be at the right distance from the origin to view the monkey.obj file in the assets folder. I will make this more dynamic if needed.
 
-M -> toggle view modes (currently just the model and voxels)
+`M` -> toggle view modes (currently just the model and voxels)
+
+`click and drag` -> rotate the camera
 
 Command line switches
 ---------------------
 
 There are currently two command line switches:
 
---view - optinally takes an argument that's either 'model', or 'voxels' for the viewer's default view
---voxelSize - takes a float parameter that's the voxels size used to voxelize the model
+`--view` - optinally takes an argument that's either 'model', or 'voxels' for the viewer's default view
+
+`--voxelSize` - takes a float parameter that's the voxels size used to voxelize the model
 
 Example:
 ```bash
