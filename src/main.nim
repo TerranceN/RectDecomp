@@ -4,10 +4,10 @@ import strutils
 
 import pipeline
 from Viewer as Viewer import nil
+from Viewer import ViewerType
 
-type
-  ViewerType {.pure.} = enum
-    model, voxels, rects
+var voxelSize: float = 0.1
+
 var useViewer = false
 var viewerType = ViewerType.model
 
@@ -19,6 +19,8 @@ else:
   for i in 0..params.len-2:
     var tokens = params[i].split(":")
     case tokens[0]:
+      of "--voxelSize":
+        voxelSize = parseFloat(tokens[1])
       of "--view":
         useViewer = true
         if tokens.len > 1:
@@ -32,7 +34,7 @@ else:
 
   echo("Processing $1" % params[params.len-1])
   var model = loadFirstModel(newFileStream(params[params.len-1], fmRead))
-  var voxels = model.voxelize(0.01)
+  var voxels = model.voxelize(voxelSize)
   echo("$1 Faces, $2 Vertices" % [$model.numFaces(), $model.numVertices()])
   if useViewer:
-    Viewer.run(model, voxels)
+    Viewer.run(model, voxels, viewerType)

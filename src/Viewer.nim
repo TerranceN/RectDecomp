@@ -12,6 +12,11 @@ import Camera
 
 const KEY_DEBUG = false
 
+type
+  ViewerType* {.pure.} = enum
+    model, voxels, rects
+var viewerType = ViewerType.model
+
 var vertShader = """
 #version 150
 
@@ -71,6 +76,7 @@ proc run*(m: Model, v: Voxtree) =
   var flatShaderLayout: ShaderDataLayout
 
   var modelMesh: Mesh
+  var voxtreeMesh: Mesh
 
   var mainCamera = initCamera()
   mainCamera.position = initVec3(0, 0, -1)
@@ -102,9 +108,9 @@ proc run*(m: Model, v: Voxtree) =
     flatShaderLayout = initShaderDataLayout(loadProgramFromStrings(vertShader, fragShader), @[
       Attribute(name: "a_position", size: 3, attribType: cGL_FLOAT)
     ])
-    modelMesh = getMeshFromModel(m, flatShaderLayout)
     # convert the models data into gl buffers to be rendered in the main loop
-    discard
+    modelMesh = getMeshFromModel(m, flatShaderLayout)
+    voxtreeMesh = getMeshFromVoxtree(v, flatShaderLayout)
 
   proc handleEvents() =
     var evt = sdl.defaultEvent
@@ -136,6 +142,11 @@ proc run*(m: Model, v: Voxtree) =
           echo(keydownEvent.keysym)
       if evt.kind == sdl.KeyUp:
         var keyupEvent = cast[sdl.KeyboardEventPtr](addr(evt))
+        if keyupEvent.keysym.scancode == sdl.SDL_SCANCODE_M:
+          if viewerType == ViewerType.voxels:
+            viewerType = ViewerType.model
+          else:
+            viewerType = viewerType.succ
         if KEY_DEBUG:
           echo("Up")
           echo(keyupEvent.keysym)
@@ -150,7 +161,6 @@ proc run*(m: Model, v: Voxtree) =
   proc update(dt: float) =
     mainCamera.update(initVec3(0, 0, 0), 5.0)
     mainCamera.lookAt(initVec3(0, 0, 0), initVec3(0, 1, 0))
-    #mainCamera.matrix.print()
 
   proc draw() =
     glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
@@ -158,7 +168,13 @@ proc run*(m: Model, v: Voxtree) =
     flatShaderLayout.loadMatrix("u_modelMatrix", identityMat4())
     flatShaderLayout.loadMatrix("u_viewMatrix", mainCamera.matrix)
     flatShaderLayout.loadMatrix("u_projectionMatrix", projectionMatrix)
-    modelMesh.render()
+    case viewerType:
+      of ViewerType.model:
+        modelMesh.render()
+      of ViewerType.voxels:
+        voxtreeMesh.render()
+      else:
+        discard
     sdl.glSwapWindow(window)
 
   discard sdl.init(sdl.INIT_EVERYTHING)
@@ -184,3 +200,6 @@ proc run*(m: Model, v: Voxtree) =
     flushFile(stdout)
   sdl.destroy window
 
+proc run*(m: Model, v: Voxtree, t: ViewerType) =
+  viewerType = t
+  run(m, v)

@@ -1,5 +1,4 @@
 import math
-import optional_t
 
 import math.vecmath
 

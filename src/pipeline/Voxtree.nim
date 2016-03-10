@@ -6,12 +6,14 @@ import math.vecmath
 import Model
 
 type
-  VoxNode = object
-    faces: seq[int]
-    children: seq[VoxNode]
+  VoxNode* = object
+    faces*: seq[int]
+    lower*: Vec3
+    size*: float
+    children*: seq[VoxNode]
   Voxtree* = object
-    model: Model
-    root: VoxNode
+    model*: Model
+    root*: VoxNode
 
 proc triangleBoxIntersection(lower: Vec3, size: float, tri: seq[Vec3]): bool =
   # Test triangle box intersection using the separating axis theorem
@@ -52,7 +54,7 @@ proc triangleBoxIntersection(lower: Vec3, size: float, tri: seq[Vec3]): bool =
     lower + initVec3(size, size, size)
   ]
 
-  var triNormal = (tri[1]-tri[0]).cross(tri[2]-tri[1]).normalize()
+  var triNormal = (tri[0]-tri[1]).cross(tri[1]-tri[2]).normalize()
   var triOffset = triNormal.dot(tri[0])
   var (boxMin, boxMax) = minMaxOnAxis(boxVertices, triNormal)
   if (boxMax < triOffset or boxMin > triOffset):
@@ -66,11 +68,16 @@ proc triangleBoxIntersection(lower: Vec3, size: float, tri: seq[Vec3]): bool =
 
   for i in 0..3:
     for j in 0..3:
-        var axis = triEdges[i].cross(boxNormals[j])
-        var (boxMin, boxMax) = minMaxOnAxis(boxVertices, axis)
-        var (triMin, triMax) = minMaxOnAxis(tri, axis)
-        if (boxMax <= triMin or boxMin >= triMax):
-          return false
+        var axis = triEdges[i].cross(boxNormals[j]).normalize()
+        if axis.length() > 0:
+          var (boxMin, boxMax) = minMaxOnAxis(boxVertices, axis)
+          var (triMin, triMax) = minMaxOnAxis(tri, axis)
+          if (boxMax <= triMin or boxMin >= triMax):
+            #echo()
+            #echo(axis)
+            #echo((boxMin, boxMax))
+            #echo((triMin, triMax))
+            return false
 
 proc quadBoxIntersection(lower: Vec3, size: float, quad: seq[Vec3]): bool =
   result = triangleBoxIntersection(lower, size, quad[0..2]) or triangleBoxIntersection(lower, size, @[quad[2], quad[3], quad[0]])
@@ -93,7 +100,7 @@ proc range(lower: int, upper: int): seq[int] =
     diff = -1
   var current = lower
   for i in 0..absDiff-1:
-    result[i] = lower
+    result[i] = current
     current += diff
 
 proc voxelizeWithBounds*(m: Model, minCorner: Vec3, maxCorner: Vec3, voxelSize: float): Voxtree =
@@ -104,9 +111,13 @@ proc voxelizeWithBounds*(m: Model, minCorner: Vec3, maxCorner: Vec3, voxelSize: 
   while maxSize < maxDiff:
     maxSize *= 2
     maxDepth += 1
+  var voxelizeSectionCalls = 0
   proc voxelizeSection(faces: seq[int], lower: Vec3, size: float): VoxNode =
+    voxelizeSectionCalls += 1
     #echo("Child with size: $1" % $size)
     result = VoxNode()
+    result.lower = lower
+    result.size = size
     # figure out which of the parent's faces are in this voxel
     proc faceIntersects(faceId: int): bool =
       result = triOrQuadBoxIntersecion(lower, size, m.faces[faceId].map(proc(x:FaceVertex): Vec3 = m.vertices[x[0]]))
@@ -124,8 +135,9 @@ proc voxelizeWithBounds*(m: Model, minCorner: Vec3, maxCorner: Vec3, voxelSize: 
       result.children.add(voxelizeSection(result.faces, lower + initVec3(newSize, newSize, 0), newSize))
       result.children.add(voxelizeSection(result.faces, lower + initVec3(newSize, newSize, newSize), newSize))
       result.children.add(voxelizeSection(result.faces, lower + initVec3(newSize, 0, newSize), newSize))
-  echo("Voxelizing a model with voxelSize $1! maxSize: $2, maxDepth: $3" % [$voxelSize, $maxSize, $maxDepth])
   result = Voxtree(model: m, root: voxelizeSection(range(0, m.faces.len), initVec3(-maxSize/2), maxSize))
+  echo("Voxelizing a model with voxelSize $1! maxSize: $2, maxDepth: $3 calculated for maxDiff: $4" % [$voxelSize, $maxSize, $maxDepth, $maxDiff])
+  echo("voxelizeSectionCalls: $1" % $voxelizeSectionCalls)
 
 
 proc voxelize*(m: Model, voxelSize: float): Voxtree =
