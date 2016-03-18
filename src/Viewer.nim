@@ -21,20 +21,31 @@ var vertShader = """
 #version 150
 
 in vec3 a_position;
+in vec3 a_instancePosition;
+in int gl_InstanceID;
 
 uniform mat4 u_modelMatrix;
 uniform mat4 u_viewMatrix;
 uniform mat4 u_projectionMatrix;
+uniform float u_scale;
 
 out vec3 v_fragCoord;
 out vec3 v_viewCoord;
+flat out float v_hue;
+flat out int v_instance;
+
+float rand(vec2 co){
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
 
 void main() {
-    vec4 fragCoord = u_modelMatrix * vec4(a_position, 1.0);
+    vec4 fragCoord = u_modelMatrix * vec4(u_scale*a_position + a_instancePosition, 1.0);
     vec4 viewCoord = u_viewMatrix * fragCoord;
 
     v_fragCoord = fragCoord.xyz;
     v_viewCoord = viewCoord.xyz;
+    v_hue = sign(gl_InstanceID)*rand(vec2(gl_InstanceID)) + (1-sign(gl_InstanceID))*0.0;
+    v_instance = gl_InstanceID;
 
     gl_Position = u_projectionMatrix * viewCoord;
 }
@@ -45,14 +56,46 @@ var fragShader = """
 
 in vec3 v_fragCoord;
 in vec3 v_viewCoord;
+flat in float v_hue;
+flat in int v_instance;
 
 uniform mat4 u_modelMatrix;
 uniform mat4 u_viewMatrix;
 
 out vec4 gl_FragColor;
 
+vec4 hsv_to_rgb(float h, float s, float v, float a)
+{
+	float c = v * s;
+	h = mod((h * 6.0), 6.0);
+	float x = c * (1.0 - abs(mod(h, 2.0) - 1.0));
+	vec4 color;
+
+	if (0.0 <= h && h < 1.0) {
+		color = vec4(c, x, 0.0, a);
+	} else if (1.0 <= h && h < 2.0) {
+		color = vec4(x, c, 0.0, a);
+	} else if (2.0 <= h && h < 3.0) {
+		color = vec4(0.0, c, x, a);
+	} else if (3.0 <= h && h < 4.0) {
+		color = vec4(0.0, x, c, a);
+	} else if (4.0 <= h && h < 5.0) {
+		color = vec4(x, 0.0, c, a);
+	} else if (5.0 <= h && h < 6.0) {
+		color = vec4(c, 0.0, x, a);
+	} else {
+		color = vec4(0.0, 0.0, 0.0, a);
+	}
+
+	color.rgb += v - c;
+
+	return color;
+}
+
 void main() {
-    vec3 diffuse = vec3(0.8);
+    vec3 hsv = hsv_to_rgb(v_hue, 1.0, 1.0, 1.0).rgb;
+    vec3 grey = vec3(0.8);
+    vec3 diffuse = sign(v_instance)*hsv + (1-sign(v_instance))*grey;
 
     vec3 normal = normalize(cross(dFdx(v_fragCoord), dFdy(v_fragCoord)));
     normal = (inverse(transpose(u_viewMatrix * u_modelMatrix)) * vec4(normal, 1.0)).xyz;
@@ -75,8 +118,8 @@ proc run*(m: Model, v: Voxtree) =
 
   var flatShaderLayout: ShaderDataLayout
 
-  var modelMesh: Mesh
-  var voxtreeMesh: Mesh
+  var modelMesh: InstancedMesh
+  var voxtreeMesh: InstancedMesh
 
   var mainCamera = initCamera()
   mainCamera.position = initVec3(0, 0, -1)
@@ -109,8 +152,8 @@ proc run*(m: Model, v: Voxtree) =
       Attribute(name: "a_position", size: 3, attribType: cGL_FLOAT)
     ])
     # convert the models data into gl buffers to be rendered in the main loop
-    modelMesh = getMeshFromModel(m, flatShaderLayout)
-    voxtreeMesh = getMeshFromVoxtree(v, flatShaderLayout)
+    modelMesh = initInstancedMesh(getMeshFromModel(m, flatShaderLayout), @[initVec3(0, 0, 0)], flatShaderLayout)
+    voxtreeMesh = getInstancedMeshFromVoxtree(v, flatShaderLayout)
 
   proc handleEvents() =
     var evt = sdl.defaultEvent
@@ -170,8 +213,10 @@ proc run*(m: Model, v: Voxtree) =
     flatShaderLayout.loadMatrix("u_projectionMatrix", projectionMatrix)
     case viewerType:
       of ViewerType.model:
+        flatShaderLayout.shader.uniform1f("u_scale", 1.0)
         modelMesh.render()
       of ViewerType.voxels:
+        flatShaderLayout.shader.uniform1f("u_scale", v.voxelSize)
         voxtreeMesh.render()
       else:
         discard

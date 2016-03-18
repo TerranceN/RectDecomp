@@ -10,7 +10,7 @@ import ShaderDataLayout
 import Model
 import Voxtree
 
-const INDEX_DATA_SIZE = 3
+const INDEX_DATA_SIZE* = 3
 
 type
   Mesh* = object
@@ -27,12 +27,14 @@ proc bindBuffers*(m: Mesh) =
   glBindBuffer(GL_ARRAY_BUFFER, m.vertexBuffer)
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.indexBuffer)
 
-proc genVAO*(self: Mesh, layout: ShaderDataLayout): GLuint =
-  result = GLuint(0)
-  glGenVertexArrays(1, addr result)
-  glBindVertexArray(result)
+proc genVAO*(self: var Mesh, layout: ShaderDataLayout, extra: proc() = nil) =
+  self.arrayBuffer = GLuint(0)
+  glGenVertexArrays(1, addr self.arrayBuffer)
+  glBindVertexArray(self.arrayBuffer)
   self.bindBuffers()
   layout.assignAttribPointers()
+  if extra != nil:
+    extra()
   glBindVertexArray(0)
 
 proc initMesh*(vertices: var seq[float32], indices: var seq[int32], layout: ShaderDataLayout): Mesh =
@@ -53,10 +55,13 @@ proc initMesh*(vertices: var seq[float32], indices: var seq[int32], layout: Shad
     indexDataSize: INDEX_DATA_SIZE,
     indexBuffer: indexBuffer
   )
-  result.arrayBuffer = result.genVAO(layout)
+  result.genVAO(layout)
+
+proc bindArrayBuffer*(m: Mesh) =
+  glBindVertexArray(m.arrayBuffer)
 
 proc render*(m: Mesh) =
-  glBindVertexArray(m.arrayBuffer)
+  m.bindArrayBuffer()
   glDrawElements(GLenum(GL_TRIANGLES), GLsizei(m.numFaces * INDEX_DATA_SIZE), GLenum(GL_UNSIGNED_INT), cast[pointer](0))
   glBindVertexArray(0)
 

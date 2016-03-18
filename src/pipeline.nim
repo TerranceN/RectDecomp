@@ -5,3 +5,4 @@ ImportExport:
   pipeline.Model
   pipeline.Voxtree
   pipeline.Mesh
+  pipeline.InstancedMesh

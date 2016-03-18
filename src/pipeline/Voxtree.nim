@@ -12,6 +12,7 @@ type
     size*: float
     children*: seq[VoxNode]
   Voxtree* = object
+    voxelSize*: float
     model*: Model
     root*: VoxNode
 
@@ -135,7 +136,7 @@ proc voxelizeWithBounds*(m: Model, minCorner: Vec3, maxCorner: Vec3, voxelSize: 
       result.children.add(voxelizeSection(result.faces, lower + initVec3(newSize, newSize, 0), newSize))
       result.children.add(voxelizeSection(result.faces, lower + initVec3(newSize, newSize, newSize), newSize))
       result.children.add(voxelizeSection(result.faces, lower + initVec3(newSize, 0, newSize), newSize))
-  result = Voxtree(model: m, root: voxelizeSection(range(0, m.faces.len), initVec3(-maxSize/2), maxSize))
+  result = Voxtree(voxelSize: voxelSize, model: m, root: voxelizeSection(range(0, m.faces.len), initVec3(-maxSize/2), maxSize))
   echo("Voxelizing a model with voxelSize $1! maxSize: $2, maxDepth: $3 calculated for maxDiff: $4" % [$voxelSize, $maxSize, $maxDepth, $maxDiff])
   echo("voxelizeSectionCalls: $1" % $voxelizeSectionCalls)
 
