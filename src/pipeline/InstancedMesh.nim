@@ -1,4 +1,5 @@
 import opengl
+import math
 import math.vecmath
 
 import Mesh
@@ -28,6 +29,11 @@ proc genVAO*(self: var InstancedMesh, layout: ShaderDataLayout, extra: proc() = 
         cast[pointer](0)
       )
       glVertexAttribDivisor(GLuint(safeSelf.positionIndex), 1)
+
+proc renderHalf*(self: InstancedMesh) =
+  self.mesh.bindArrayBuffer()
+  glDrawElementsInstanced(GLenum(GL_TRIANGLES), GLsizei(self.mesh.numFaces * INDEX_DATA_SIZE), GLenum(GL_UNSIGNED_INT), cast[pointer](0), GLsizei(ceil(self.numPositions / 2)))
+  glBindVertexArray(0)
 
 proc render*(self: InstancedMesh) =
   self.mesh.bindArrayBuffer()

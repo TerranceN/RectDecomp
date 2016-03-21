@@ -32,7 +32,6 @@ uniform float u_scale;
 out vec3 v_fragCoord;
 out vec3 v_viewCoord;
 flat out float v_hue;
-flat out int v_instance;
 
 float rand(vec2 co){
     return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
@@ -45,7 +44,6 @@ void main() {
     v_fragCoord = fragCoord.xyz;
     v_viewCoord = viewCoord.xyz;
     v_hue = sign(gl_InstanceID)*rand(vec2(gl_InstanceID)) + (1-sign(gl_InstanceID))*0.0;
-    v_instance = gl_InstanceID;
 
     gl_Position = u_projectionMatrix * viewCoord;
 }
@@ -57,10 +55,10 @@ var fragShader = """
 in vec3 v_fragCoord;
 in vec3 v_viewCoord;
 flat in float v_hue;
-flat in int v_instance;
 
 uniform mat4 u_modelMatrix;
 uniform mat4 u_viewMatrix;
+uniform float u_randomColors;
 
 out vec4 gl_FragColor;
 
@@ -95,7 +93,7 @@ vec4 hsv_to_rgb(float h, float s, float v, float a)
 void main() {
     vec3 hsv = hsv_to_rgb(v_hue, 1.0, 1.0, 1.0).rgb;
     vec3 grey = vec3(0.8);
-    vec3 diffuse = sign(v_instance)*hsv + (1-sign(v_instance))*grey;
+    vec3 diffuse = u_randomColors*hsv + (1-u_randomColors)*grey;
 
     vec3 normal = normalize(cross(dFdx(v_fragCoord), dFdy(v_fragCoord)));
     normal = (inverse(transpose(u_viewMatrix * u_modelMatrix)) * vec4(normal, 1.0)).xyz;
@@ -120,6 +118,9 @@ proc run*(m: Model, v: Voxtree) =
 
   var modelMesh: InstancedMesh
   var voxtreeMesh: InstancedMesh
+
+  var renderHalf = false
+  var randomColors = false
 
   var mainCamera = initCamera()
   mainCamera.position = initVec3(0, 0, -1)
@@ -185,6 +186,10 @@ proc run*(m: Model, v: Voxtree) =
           echo(keydownEvent.keysym)
       if evt.kind == sdl.KeyUp:
         var keyupEvent = cast[sdl.KeyboardEventPtr](addr(evt))
+        if keyupEvent.keysym.scancode == sdl.SDL_SCANCODE_H:
+          renderHalf = not renderHalf
+        if keyupEvent.keysym.scancode == sdl.SDL_SCANCODE_C:
+          randomColors = not randomColors
         if keyupEvent.keysym.scancode == sdl.SDL_SCANCODE_M:
           if viewerType == ViewerType.voxels:
             viewerType = ViewerType.model
@@ -213,11 +218,16 @@ proc run*(m: Model, v: Voxtree) =
     flatShaderLayout.loadMatrix("u_projectionMatrix", projectionMatrix)
     case viewerType:
       of ViewerType.model:
+        flatShaderLayout.shader.uniform1f("u_randomColors", 0.0)
         flatShaderLayout.shader.uniform1f("u_scale", 1.0)
         modelMesh.render()
       of ViewerType.voxels:
+        flatShaderLayout.shader.uniform1f("u_randomColors", if randomColors: 1.0 else: 0.0)
         flatShaderLayout.shader.uniform1f("u_scale", v.voxelSize)
-        voxtreeMesh.render()
+        if renderHalf:
+          voxtreeMesh.renderHalf()
+        else:
+          voxtreeMesh.render()
       else:
         discard
     sdl.glSwapWindow(window)
