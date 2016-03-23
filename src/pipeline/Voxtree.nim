@@ -67,8 +67,8 @@ proc triangleBoxIntersection(lower: Vec3, size: float, tri: seq[Vec3]): bool =
     tri[2]-tri[0]
   ]
 
-  for i in 0..3:
-    for j in 0..3:
+  for i in 0..2:
+    for j in 0..2:
         var axis = triEdges[i].cross(boxNormals[j]).normalize()
         if axis.length() > 0:
           var (boxMin, boxMax) = minMaxOnAxis(boxVertices, axis)
