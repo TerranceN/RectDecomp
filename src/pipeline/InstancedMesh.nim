@@ -111,12 +111,15 @@ proc cubeMode(layout: ShaderDataLayout): Mesh =
 
 proc getInstancedMeshFromVoxtree*(v: Voxtree, layout: ShaderDataLayout): InstancedMesh =
   var positions = newSeq[Vec3]()
-  proc meshifyVoxNode(node: VoxNode) =
-    if node.children.len == 0:
-      if node.faces.len != 0:
-        positions.add(node.lower + initVec3(node.size)*0.5)
-    else:
-      for child in node.children:
-        meshifyVoxNode(child)
-  meshifyVoxNode(v.root)
+  proc meshifyVoxNode(node: int) =
+    var children = v.nodeChildren(node)
+    if v.voxNodes[node]:
+      if children.len == 0:
+        var lower = v.nodeLower(node)
+        var size = v.nodeSize(node)
+        positions.add(lower + initVec3(size)*0.5)
+      else:
+        for child in children:
+          meshifyVoxNode(child)
+  meshifyVoxNode(0)
   result = initInstancedMesh(cubeMode(layout), positions, layout)

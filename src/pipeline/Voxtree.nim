@@ -1,20 +1,78 @@
 import strutils
 import sequtils
 
+import math
 import math.vecmath
 
 import Model
 
 type
-  VoxNode* = object
-    faces*: seq[int]
-    lower*: Vec3
-    size*: float
-    children*: seq[VoxNode]
   Voxtree* = object
+    voxNodes*: seq[bool]
     voxelSize*: float
+    maxDepth*: int
     model*: Model
-    root*: VoxNode
+
+var baseLevels: seq[int] = @[0]
+proc baseLevel(level: int): int =
+  if level >= baseLevels.len:
+    for i in baseLevels.len..level:
+      baseLevels.add(baseLevels[i-1] + 8^(i-1))
+  return baseLevels[level]
+
+proc range(lower: int, upper: int): seq[int] =
+  var absDiff = abs(lower - upper)
+  result = newSeq[int](absDiff)
+  var diff = 1
+  if lower > upper:
+    diff = -1
+  var current = lower
+  for i in 0..absDiff-1:
+    result[i] = current
+    current += diff
+
+proc nodeDepth*(tree: VoxTree, node: int): int =
+  var base = 0
+  var depth = 0
+  while (node >= base):
+    base = baseLevel(depth+1)
+    depth += 1
+  result = depth-1
+
+proc nodeChildren*(tree: VoxTree, node: int): seq[int] =
+  result = newSeq[int](8)
+  var depth = tree.nodeDepth(node)
+  if depth == 0:
+    return range(1, 9)
+  if depth == tree.maxDepth-1:
+    return @[]
+  var nth = node - baseLevel(depth)
+  for i in 0..7:
+    result[i] = i + baseLevel(depth+1) + nth*8
+
+proc nodeSize*(tree: VoxTree, node: int): float =
+  return tree.voxelSize * float(2^(tree.maxDepth - tree.nodeDepth(node))) / 2
+
+proc nodeParent*(tree: VoxTree, node: int): int =
+  var depth = tree.nodeDepth(node)
+  var nthChild = (node - baseLevel(depth)) div 8
+  return baseLevel(depth-1) + nthChild
+
+proc nodeLower*(tree: VoxTree, node: int): Vec3 =
+  var size = tree.nodeSize(node)
+  if node == 0:
+    return initVec3(-size/2)
+  var depth = tree.nodeDepth(node)
+  var nthChild = (node - baseLevel(depth)) mod 8
+  var topLeft = tree.nodeLower(tree.nodeParent(node)) + initVec3(0)
+  var sizeVec = initVec3(0)
+  if (0b100 and nthChild) > 0:
+    sizeVec.x = size
+  if (0b010 and nthChild) > 0:
+    sizeVec.y = size
+  if (0b001 and nthChild) > 0:
+    sizeVec.z = size
+  return topLeft + sizeVec
 
 proc triangleBoxIntersection(lower: Vec3, size: float, tri: seq[Vec3]): bool =
   # Test triangle box intersection using the separating axis theorem
@@ -93,17 +151,6 @@ proc triOrQuadBoxIntersecion(lower: Vec3, size: float, verts: seq[Vec3]): bool =
     else:
       result = false
 
-proc range(lower: int, upper: int): seq[int] =
-  var absDiff = abs(lower - upper)
-  result = newSeq[int](absDiff)
-  var diff = 1
-  if lower > upper:
-    diff = -1
-  var current = lower
-  for i in 0..absDiff-1:
-    result[i] = current
-    current += diff
-
 proc voxelizeWithBounds*(m: Model, minCorner: Vec3, maxCorner: Vec3, voxelSize: float): Voxtree =
   var maxSize = voxelSize
   var maxDepth = 1
@@ -113,33 +160,33 @@ proc voxelizeWithBounds*(m: Model, minCorner: Vec3, maxCorner: Vec3, voxelSize: 
     maxSize *= 2
     maxDepth += 1
   var voxelizeSectionCalls = 0
-  proc voxelizeSection(faces: seq[int], lower: Vec3, size: float): VoxNode =
+  echo("Number of voxels: ")
+  echo(baseLevel(maxDepth))
+  var tree = Voxtree(voxNodes: newSeq[bool](baseLevel(maxDepth)), voxelSize: voxelSize, maxDepth: maxDepth, model: m)
+  proc voxelizeSection(index: int, faces: seq[int], lower: Vec3, size: float) =
     voxelizeSectionCalls += 1
-    #echo("Child with size: $1" % $size)
-    result = VoxNode()
-    result.lower = lower
-    result.size = size
     # figure out which of the parent's faces are in this voxel
     proc faceIntersects(faceId: int): bool =
       result = triOrQuadBoxIntersecion(lower, size, m.faces[faceId].map(proc(x:FaceVertex): Vec3 = m.vertices[x[0]]))
-    result.faces = faces.filter(faceIntersects)
+    var newFaces = faces.filter(faceIntersects)
+    tree.voxNodes[index] = newFaces.len > 0
     # if we have faces and we're not at the target voxel size, recurse, spliting the area into eight children
-    if result.faces.len > 0 and size > voxelSize:
-      result.children = newSeq[VoxNode]()
+    if newFaces.len > 0 and size > voxelSize:
+      var children = tree.nodeChildren(index)
       var newSize = size/2
       # process each child and add it
-      result.children.add(voxelizeSection(result.faces, lower + initVec3(0, 0, 0), newSize))
-      result.children.add(voxelizeSection(result.faces, lower + initVec3(0, newSize, 0), newSize))
-      result.children.add(voxelizeSection(result.faces, lower + initVec3(0, newSize, newSize), newSize))
-      result.children.add(voxelizeSection(result.faces, lower + initVec3(0, 0, newSize), newSize))
-      result.children.add(voxelizeSection(result.faces, lower + initVec3(newSize, 0, 0), newSize))
-      result.children.add(voxelizeSection(result.faces, lower + initVec3(newSize, newSize, 0), newSize))
-      result.children.add(voxelizeSection(result.faces, lower + initVec3(newSize, newSize, newSize), newSize))
-      result.children.add(voxelizeSection(result.faces, lower + initVec3(newSize, 0, newSize), newSize))
-  result = Voxtree(voxelSize: voxelSize, model: m, root: voxelizeSection(range(0, m.faces.len), initVec3(-maxSize/2), maxSize))
+      voxelizeSection(children[0], newFaces, lower + initVec3(0, 0, 0), newSize)
+      voxelizeSection(children[1], newFaces, lower + initVec3(0, 0, newSize), newSize)
+      voxelizeSection(children[2], newFaces, lower + initVec3(0, newSize, 0), newSize)
+      voxelizeSection(children[3], newFaces, lower + initVec3(0, newSize, newSize), newSize)
+      voxelizeSection(children[4], newFaces, lower + initVec3(newSize, 0, 0), newSize)
+      voxelizeSection(children[5], newFaces, lower + initVec3(newSize, 0, newSize), newSize)
+      voxelizeSection(children[6], newFaces, lower + initVec3(newSize, newSize, 0), newSize)
+      voxelizeSection(children[7], newFaces, lower + initVec3(newSize, newSize, newSize), newSize)
+  voxelizeSection(0, range(0, m.faces.len), initVec3(-maxSize/2), maxSize)
   echo("Voxelizing a model with voxelSize $1! maxSize: $2, maxDepth: $3 calculated for maxDiff: $4" % [$voxelSize, $maxSize, $maxDepth, $maxDiff])
+  result = tree
   echo("voxelizeSectionCalls: $1" % $voxelizeSectionCalls)
-
 
 proc voxelize*(m: Model, voxelSize: float): Voxtree =
   var (minBound, maxBound) = m.getBounds()

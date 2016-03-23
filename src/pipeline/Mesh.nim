@@ -83,20 +83,23 @@ proc getMeshFromModel*(m: Model, layout: ShaderDataLayout): Mesh =
 proc getMeshFromVoxtree*(v: Voxtree, layout: ShaderDataLayout): Mesh =
   var vertexData = newSeq[float32]()
   var indexData = newSeq[int32]()
-  proc meshifyVoxNode(node: VoxNode) =
-    if node.children.len == 0:
-      if node.faces.len != 0:
+  proc meshifyVoxNode(node: int) =
+    var children = v.nodeChildren(node)
+    if children.len == 0:
+      if v.voxNodes[node]:
         var baseIndex = int(vertexData.len / 3)
         # add vertices
+        var lower = v.nodeLower(node)
+        var size = v.nodeSize(node)
         var boxVertices = @[
-          node.lower + initVec3(0, 0, 0),
-          node.lower + initVec3(0, 0, node.size),
-          node.lower + initVec3(0, node.size, 0),
-          node.lower + initVec3(0, node.size, node.size),
-          node.lower + initVec3(node.size, 0, 0),
-          node.lower + initVec3(node.size, 0, node.size),
-          node.lower + initVec3(node.size, node.size, 0),
-          node.lower + initVec3(node.size, node.size, node.size)
+          lower + initVec3(0, 0, 0),
+          lower + initVec3(0, 0, size),
+          lower + initVec3(0, size, 0),
+          lower + initVec3(0, size, size),
+          lower + initVec3(size, 0, 0),
+          lower + initVec3(size, 0, size),
+          lower + initVec3(size, size, 0),
+          lower + initVec3(size, size, size)
         ]
         for vertex in boxVertices:
           for i in 0..2:
@@ -129,9 +132,9 @@ proc getMeshFromVoxtree*(v: Voxtree, layout: ShaderDataLayout): Mesh =
           ]:
           indexData.add(int32(baseIndex+i))
     else:
-      for child in node.children:
+      for child in children:
         meshifyVoxNode(child)
-  meshifyVoxNode(v.root)
+  meshifyVoxNode(0)
   echo($vertexData.len)
   echo($indexData.len)
   result = initMesh(vertexData, indexData, layout)
