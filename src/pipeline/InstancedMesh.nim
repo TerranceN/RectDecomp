@@ -113,7 +113,7 @@ proc getInstancedMeshFromVoxtree*(v: Voxtree, layout: ShaderDataLayout): Instanc
   var positions = newSeq[Vec3]()
   proc meshifyVoxNode(node: int) =
     var children = v.nodeChildren(node)
-    if v.voxNodes[node]:
+    if v[node]:
       if children.len == 0:
         var lower = v.nodeLower(node)
         var size = v.nodeSize(node)

@@ -86,7 +86,7 @@ proc getMeshFromVoxtree*(v: Voxtree, layout: ShaderDataLayout): Mesh =
   proc meshifyVoxNode(node: int) =
     var children = v.nodeChildren(node)
     if children.len == 0:
-      if v.voxNodes[node]:
+      if v[node]:
         var baseIndex = int(vertexData.len / 3)
         # add vertices
         var lower = v.nodeLower(node)

@@ -1,5 +1,6 @@
 import strutils
 import sequtils
+import tables
 
 import math
 import math.vecmath
@@ -8,7 +9,7 @@ import Model
 
 type
   Voxtree* = object
-    voxNodes*: seq[bool]
+    voxNodes*: Table[int, bool]
     voxelSize*: float
     maxDepth*: int
     model*: Model
@@ -73,6 +74,12 @@ proc nodeLower*(tree: VoxTree, node: int): Vec3 =
   if (0b001 and nthChild) > 0:
     sizeVec.z = size
   return topLeft + sizeVec
+
+proc `[]`*(tree: VoxTree, index: int): bool =
+  try:
+    result = tree.voxNodes[index]
+  except KeyError:
+    result = false
 
 proc triangleBoxIntersection(lower: Vec3, size: float, tri: seq[Vec3]): bool =
   # Test triangle box intersection using the separating axis theorem
@@ -162,7 +169,7 @@ proc voxelizeWithBounds*(m: Model, minCorner: Vec3, maxCorner: Vec3, voxelSize: 
   var voxelizeSectionCalls = 0
   echo("Number of voxels: ")
   echo(baseLevel(maxDepth))
-  var tree = Voxtree(voxNodes: newSeq[bool](baseLevel(maxDepth)), voxelSize: voxelSize, maxDepth: maxDepth, model: m)
+  var tree = Voxtree(voxNodes: initTable[int, bool](), voxelSize: voxelSize, maxDepth: maxDepth, model: m)
   proc voxelizeSection(index: int, faces: seq[int], lower: Vec3, size: float) =
     voxelizeSectionCalls += 1
     # figure out which of the parent's faces are in this voxel
