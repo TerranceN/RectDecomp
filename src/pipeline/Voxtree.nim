@@ -347,16 +347,6 @@ proc voxelizeWithBounds*(m: Model, minCorner: Vec3, maxCorner: Vec3, voxelSize: 
     # figure out which of the parent's faces are in this voxel
     proc faceIntersects(faceId: int): bool =
       result = triOrQuadBoxIntersecion(lower, size, m.faces[faceId].map(proc(x:FaceVertex): Vec3 = m.vertices[x[0]]))
-    proc getNormal(face: int): Vec3 =
-      var f = m.faces[face]
-      var e1 = m.vertices[f[1][0]]-m.vertices[f[0][0]]
-      var e2 = m.vertices[f[2][0]]-m.vertices[f[1][0]]
-      return e1.cross(e2).normalize()
-    proc getNormals(faces: seq[int]): Vec3 =
-      var total = initVec3(0)
-      for face in faces:
-        total = total + getNormal(face)
-      return total.normalize()
     var newFaces = faces.filter(faceIntersects)
     if newFaces.len > 0:
       tree.voxFaces[index] = newFaces

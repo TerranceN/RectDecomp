@@ -209,7 +209,7 @@ proc run*(m: Model, v: Voxtree, r: RectDecomp) =
 
 
   proc update(dt: float) =
-    mainCamera.update(initVec3(0, 0, 0), 5.0)
+    mainCamera.update(initVec3(0, 0, 0), 10.0)
     mainCamera.lookAt(initVec3(0, 0, 0), initVec3(0, 1, 0))
 
   proc draw() =

@@ -223,30 +223,172 @@ proc rectDecomp*(v: Voxtree): RectDecomp =
   echo("  Done!")
 
   echo("  Step 2) Generate rectangles")
+
+  #block:
+  #  for x in 0..voxelsPerAxis-1:
+  #    for y in 0..voxelsPerAxis-1:
+  #      for z in 0..voxelsPerAxis-1:
+  #        var node = v.nodeAtIndex((x, y, z))
+  #        if v.isInsideModel(node):
+  #          var startLower = v.realLowerOf(node)
+  #          rects.add((startLower, initVec3(v.voxelSize)))
+
+  #block:
+  #  var axis = XAXIS
+  #  var firsts = addr firstForAxis[axis]
+  #  var nexts = addr nextForAxis[axis]
+  #  var segments = addr segForAxis[axis]
+  #  for y in 0..voxelsPerAxis-1:
+  #    for z in 0..voxelsPerAxis-1:
+  #      if (y, z) in firsts[]:
+  #        var start = firsts[][(y, z)]
+  #        while (start >= 0 and start in segments[]):
+  #          var seg = segments[][start]
+  #          var startLower = v.realLowerOf(start)
+  #          var finish = start
+  #          var index = seg[0]
+  #          if (axis and XAXIS) > 0:
+  #            index.x += seg[1]
+  #          if (axis and YAXIS) > 0:
+  #            index.y += seg[1]
+  #          if (axis and ZAXIS) > 0:
+  #            index.z += seg[1]
+  #          finish = v.nodeAtIndex(index)
+  #          var finishLower = v.realLowerOf(finish)
+  #          rects.add((startLower, finishLower + initVec3(v.voxelSize) - startLower))
+  #          start = if start in nexts[]: nexts[][start] else: -1
+
   block:
-    var axis = XAXIS
-    var firsts = addr firstForAxis[axis]
-    var nexts = addr nextForAxis[axis]
-    var segments = addr segForAxis[axis]
-    for y in 0..voxelsPerAxis-1:
+    var finished = false
+
+    while not finished:
+      var maxRectIndexLower = (x: 0, y: 0, z: 0)
+      var maxRectIndexSize = (x: 0, y: 0, z:0)
+      var maxRectLower = initVec3(0)
+      var maxRectSize = initVec3(0)
+      var maxSize = 0
+
+      finished = true
       for z in 0..voxelsPerAxis-1:
-        if (y, z) in firsts[]:
-          var start = firsts[][(y, z)]
-          while (start >= 0 and start in segments[]):
-            var seg = segments[][start]
-            var startLower = v.realLowerOf(start)
-            var finish = start
-            var index = seg[0]
-            if (axis and XAXIS) > 0:
-              index.x += seg[1]
-            if (axis and YAXIS) > 0:
-              index.y += seg[1]
-            if (axis and ZAXIS) > 0:
-              index.z += seg[1]
-            finish = v.nodeAtIndex(index)
-            var finishLower = v.realLowerOf(finish)
-            rects.add((startLower, finishLower + initVec3(v.voxelSize) - startLower))
-            start = if start in nexts[]: nexts[][start] else: -1
+        for y in 0..voxelsPerAxis-1:
+          if (y, z) in firstForAxis[XAXIS]:
+            var start = firstForAxis[XAXIS][(y, z)]
+            while (start >= 0 and start in segForAxis[XAXIS]):
+              if (y, z) == (23, 24):
+                echo("omgwtfbbq")
+              var seg = segForAxis[XAXIS][start]
+              var corner = seg[0]
+              var zlen = 0
+              var ylen = 0
+              block:
+                var minLen = -1
+                for xOffset in 0..seg[1]:
+                  var xyIndex = (corner.x+xOffset, y)
+                  # TODO: remove
+                  if not (xyIndex in firstForAxis[ZAXIS]):
+                    break
+                  var tmp = firstForAxis[ZAXIS][xyIndex]
+                  var seg = segForAxis[ZAXIS][tmp]
+                  var last = tmp
+                  while tmp >= 0 and seg[0].z < corner.z:
+                    last = tmp
+                    tmp = if tmp in nextForAxis[ZAXIS]: nextForAxis[ZAXIS][tmp] else: -1
+                    if tmp in segForAxis[ZAXIS]:
+                      seg = segForAxis[ZAXIS][tmp]
+                  seg = segForAxis[ZAXIS][last]
+                  var zlen = seg[0].z + seg[1] - corner.z
+                  if minLen == -1 or zlen < minLen:
+                    minLen = zlen
+                zlen = minLen
+              block:
+                var minLen = -1
+                for xOffset in 0..seg[1]:
+                  for zOffset in 0..zlen:
+                    var xzIndex = (corner.x+xOffset, z+zOffset)
+                    # TODO: remove
+                    if not (xzIndex in firstForAxis[YAXIS]):
+                      break
+                    var tmp = firstForAxis[YAXIS][xzIndex]
+                    var seg = segForAxis[YAXIS][tmp]
+                    var last = tmp
+                    while tmp >= 0 and seg[0].y < corner.y:
+                      last = tmp
+                      tmp = if tmp in nextForAxis[YAXIS]: nextForAxis[YAXIS][tmp] else: -1
+                      if tmp in segForAxis[YAXIS]:
+                        seg = segForAxis[YAXIS][tmp]
+                    seg = segForAxis[YAXIS][last]
+                    var ylen = seg[0].y + seg[1] - corner.y
+                    if minLen == -1 or ylen < minLen:
+                      minLen = ylen
+                ylen = minLen
+              var rectSize = (seg[1]+1)*(ylen+1)*(zlen+1)
+              if rectSize > maxSize:
+                finished = false
+                maxSize = rectSize
+                var finish = v.nodeAtIndex((corner.x+seg[1], corner.y+ylen, corner.z+zlen))
+                var finishLower = v.realLowerOf(finish)
+                maxRectLower = v.realLowerOf(start)
+                maxRectSize = finishLower + initVec3(v.voxelSize) - maxRectLower
+                maxRectIndexLower = corner
+                maxRectIndexSize = (seg[1], ylen, zlen)
+              start = if start in nextForAxis[XAXIS]: nextForAxis[XAXIS][start] else: -1
+      if not finished:
+        echo("    Rekt: ($1, $2)" % [$maxRectLower, $maxRectSize])
+        rects.add((maxRectLower, maxRectSize))
+        # remove rect from scene by updating first and next hashmaps
+        var indexSizeLst = [maxRectIndexSize[0], maxRectIndexSize[1], maxRectIndexSize[2]]
+        var indexLowerLst = [maxRectIndexLower[0], maxRectIndexLower[1], maxRectIndexLower[2]]
+        for i in 0..AXES.len-1:
+          var otherAxes = newSeq[int]()
+          for j in 0..AXES.len-1:
+            if i != j:
+              otherAxes.add(j)
+          for yOffset in 0..indexSizeLst[otherAxes[0]]:
+            for zOffset in 0..indexSizeLst[otherAxes[1]]:
+              var yzIndex = (indexLowerLst[otherAxes[0]] + yOffset, indexLowerLst[otherAxes[1]] + zOffset)
+              var first = firstForAxis[AXES[i]][yzIndex]
+              var node = first
+              var prev = node
+              var seg = segForAxis[AXES[i]][node]
+              var lowerLst = [seg[0].x, seg[0].y, seg[0].z]
+              while node >= 0 and indexLowerLst[i] > lowerLst[i] + seg[1]:
+                prev = node
+                node = if node in nextForAxis[AXES[i]]: nextForAxis[AXES[i]][node] else: -1
+                if node in segForAxis[AXES[i]]:
+                  seg = segForAxis[AXES[i]][node]
+                  lowerLst = [seg[0].x, seg[0].y, seg[0].z]
+              if indexLowerLst[i]+indexSizeLst[i] != lowerLst[i] + seg[1]:
+                # add a segment that fills the gap
+                var next = if node in nextForAxis[AXES[i]]: nextForAxis[AXES[i]][node] else: -1
+                var indexLst = [0, 0, 0]
+                var size = (lowerLst[i] + seg[1]) - (indexLowerLst[i] + indexSizeLst[i]) - 1
+                for j in 0..AXES.len-1:
+                  if i == j:
+                    indexLst[j] = indexLowerLst[i]+indexSizeLst[i]+1
+                  else:
+                    indexLst[j] = lowerLst[j]
+                var index = (indexLst[0], indexLst[1], indexLst[2])
+                var start = v.nodeAtIndex(index)
+                nextForAxis[AXES[i]][node] = start
+                if next >= 0:
+                  nextForAxis[AXES[i]][start] = next
+                segForAxis[AXES[i]][start] = (index, size)
+              if indexLowerLst[i] != lowerLst[i]:
+                # doesn't touch front edge, make this segment smaller
+                segForAxis[AXES[i]][node][1] = indexLowerLst[i] - lowerLst[i] - 1
+              else:
+                # touches front edge, so remove this segment
+                if node == first:
+                  if node in nextForAxis[AXES[i]]:
+                    firstForAxis[AXES[i]][yzIndex] = nextForAxis[AXES[i]][node]
+                  else:
+                    firstForAxis[AXES[i]].del(yzIndex)
+                else:
+                  if node in nextForAxis[AXES[i]]:
+                    nextForAxis[AXES[i]][prev] = nextForAxis[AXES[i]][node]
+                  else:
+                    nextForAxis[AXES[i]].del(node)
+
   echo("  Done!")
 
   echo("Done!")
