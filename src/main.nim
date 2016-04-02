@@ -32,9 +32,10 @@ else:
             of "rects":
               viewerType = ViewerType.rects
 
-  echo("Processing $1" % params[params.len-1])
+  echo("Processing $1..." % params[params.len-1])
   var model = loadFirstModel(newFileStream(params[params.len-1], fmRead))
+  echo("Done! $1 Faces, $2 Vertices" % [$model.numFaces(), $model.numVertices()])
   var voxels = model.voxelize(voxelSize)
-  echo("$1 Faces, $2 Vertices" % [$model.numFaces(), $model.numVertices()])
+  var rects = voxels.rectDecomp()
   if useViewer:
-    Viewer.run(model, voxels, viewerType)
+    Viewer.run(model, voxels, rects, viewerType)

@@ -24,9 +24,10 @@ proc lookAt*(self: var Camera, look: Vec3, up: Vec3) =
   ]) * translateMat4(-self.position)
 
 proc update*(self: var Camera, target: Vec3, dist: float) =
-  self.position = target + (rotateMat4(self.rotation) * initVec4(initVec3(0, 0, dist), 0)).xyz
+  self.position = target + rotateMat4(self.rotation) * initVec3(0, 0, dist)
   var diff = (self.position - target)
 
 proc handleMouseMovement*(self: var Camera, xrel: int, yrel: int) =
-  self.rotation = self.rotation.normalize() * axisAngleQuat(initVec3(0, 1, 0), -xrel.float/(160*PI)).normalize()
-  self.rotation = self.rotation.normalize() * axisAngleQuat(initVec3(1, 0, 0), -yrel.float/(160*PI)).normalize()
+  self.rotation = axisAngleQuat(initVec3(0, 1, 0), -xrel.float/(160*PI)).normalize() * self.rotation.normalize()
+  var axis = self.matrix.inverse() * initVec3(1, 0, 0)
+  self.rotation = axisAngleQuat(axis, -yrel.float/(160*PI)).normalize() * self.rotation.normalize()

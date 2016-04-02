@@ -41,6 +41,9 @@ proc `*`*(self: Mat4, other: Vec4): Vec4 =
     rowDot(3)
   )
 
+proc `*`*(self: Mat4, other: Vec3): Vec3 =
+  return (self * initVec4(other, 0)).xyz
+
 proc transpose*(self: Mat4): Mat4 =
   result = identityMat4()
   for i in 0..3:

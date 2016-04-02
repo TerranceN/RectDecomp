@@ -6,3 +6,4 @@ ImportExport:
   pipeline.Voxtree
   pipeline.Mesh
   pipeline.InstancedMesh
+  pipeline.RectDecomp

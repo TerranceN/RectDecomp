@@ -20,6 +20,14 @@ proc `[]`*(self: Vec3, i: int): float =
     of 2: return self.z
     else: return 0
 
+proc `[]=`*(self: var Vec3, i: int, rightSide: float) =
+  assert(i >= 0 and i < 3, "Vec3's only have 3 components, the index given is invalid")
+  case i:
+    of 0: self.x = rightSide
+    of 1: self.y = rightSide
+    of 2: self.z = rightSide
+    else: discard
+
 proc `+`*(self: Vec3, other: Vec3): Vec3 =
   return Vec3(x: self.x + other.x, y: self.y + other.y, z: self.z + other.z)
 

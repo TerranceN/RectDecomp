@@ -84,13 +84,13 @@ proc getMeshFromVoxtree*(v: Voxtree, layout: ShaderDataLayout): Mesh =
   var vertexData = newSeq[float32]()
   var indexData = newSeq[int32]()
   proc meshifyVoxNode(node: int) =
-    var children = v.nodeChildren(node)
+    var children = v.childrenOf(node)
     if children.len == 0:
       if v[node]:
         var baseIndex = int(vertexData.len / 3)
         # add vertices
-        var lower = v.nodeLower(node)
-        var size = v.nodeSize(node)
+        var lower = v.realLowerOf(node)
+        var size = v.realSizeOf(node)
         var boxVertices = @[
           lower + initVec3(0, 0, 0),
           lower + initVec3(0, 0, size),

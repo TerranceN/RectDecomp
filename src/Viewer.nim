@@ -22,12 +22,12 @@ var vertShader = """
 
 in vec3 a_position;
 in vec3 a_instancePosition;
+in vec3 a_instanceScale;
 in int gl_InstanceID;
 
 uniform mat4 u_modelMatrix;
 uniform mat4 u_viewMatrix;
 uniform mat4 u_projectionMatrix;
-uniform float u_scale;
 
 out vec3 v_fragCoord;
 out vec3 v_viewCoord;
@@ -38,7 +38,7 @@ float rand(vec2 co){
 }
 
 void main() {
-    vec4 fragCoord = u_modelMatrix * vec4(u_scale*a_position + a_instancePosition, 1.0);
+    vec4 fragCoord = u_modelMatrix * vec4(a_instanceScale*a_position + a_instancePosition, 1.0);
     vec4 viewCoord = u_viewMatrix * fragCoord;
 
     v_fragCoord = fragCoord.xyz;
@@ -103,7 +103,7 @@ void main() {
 }
 """
 
-proc run*(m: Model, v: Voxtree) =
+proc run*(m: Model, v: Voxtree, r: RectDecomp) =
   var window: sdl.WindowPtr = nil
   var runGame = true
   var modelMatrix = identityMat4()
@@ -118,6 +118,7 @@ proc run*(m: Model, v: Voxtree) =
 
   var modelMesh: InstancedMesh
   var voxtreeMesh: InstancedMesh
+  var rectMesh: InstancedMesh
 
   var renderHalf = false
   var randomColors = false
@@ -155,6 +156,7 @@ proc run*(m: Model, v: Voxtree) =
     # convert the models data into gl buffers to be rendered in the main loop
     modelMesh = initInstancedMesh(getMeshFromModel(m, flatShaderLayout), @[initVec3(0, 0, 0)], flatShaderLayout)
     voxtreeMesh = getInstancedMeshFromVoxtree(v, flatShaderLayout)
+    rectMesh = getInstancedMeshFromRectDecomp(r, flatShaderLayout)
 
   proc handleEvents() =
     var evt = sdl.defaultEvent
@@ -191,7 +193,7 @@ proc run*(m: Model, v: Voxtree) =
         if keyupEvent.keysym.scancode == sdl.SDL_SCANCODE_C:
           randomColors = not randomColors
         if keyupEvent.keysym.scancode == sdl.SDL_SCANCODE_M:
-          if viewerType == ViewerType.voxels:
+          if viewerType == ViewerType.rects:
             viewerType = ViewerType.model
           else:
             viewerType = viewerType.succ
@@ -219,15 +221,19 @@ proc run*(m: Model, v: Voxtree) =
     case viewerType:
       of ViewerType.model:
         flatShaderLayout.shader.uniform1f("u_randomColors", 0.0)
-        flatShaderLayout.shader.uniform1f("u_scale", 1.0)
         modelMesh.render()
       of ViewerType.voxels:
         flatShaderLayout.shader.uniform1f("u_randomColors", if randomColors: 1.0 else: 0.0)
-        flatShaderLayout.shader.uniform1f("u_scale", v.voxelSize)
         if renderHalf:
           voxtreeMesh.renderHalf()
         else:
           voxtreeMesh.render()
+      of ViewerType.rects:
+        flatShaderLayout.shader.uniform1f("u_randomColors", if randomColors: 1.0 else: 0.0)
+        if renderHalf:
+          rectMesh.renderHalf()
+        else:
+          rectMesh.render()
       else:
         discard
     sdl.glSwapWindow(window)
@@ -255,6 +261,6 @@ proc run*(m: Model, v: Voxtree) =
     flushFile(stdout)
   sdl.destroy window
 
-proc run*(m: Model, v: Voxtree, t: ViewerType) =
+proc run*(m: Model, v: Voxtree, r: RectDecomp, t: ViewerType) =
   viewerType = t
-  run(m, v)
+  run(m, v, r)
