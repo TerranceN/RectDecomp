@@ -145,7 +145,7 @@ proc nextInDir(v: Voxtree, node: int, dir: int): int =
     current = v.parentOf(current)
   return -1
 
-proc rectDecomp*(v: Voxtree): RectDecomp =
+proc rectDecomp*(v: Voxtree): (RectDecomp, seq[(VoxIndex, VoxIndex)]) =
   echo("Decomposing into rectangles...")
   # build jump hashmaps for each direction to speed up box finding
   #
@@ -161,6 +161,7 @@ proc rectDecomp*(v: Voxtree): RectDecomp =
   var fifthVoxels = voxelsPerAxis div 20
 
   var rects = newSeq[Rect]()
+  var indexRects = newSeq[(VoxIndex, VoxIndex)]()
 
   var startTime = cpuTime()
 
@@ -335,6 +336,7 @@ proc rectDecomp*(v: Voxtree): RectDecomp =
       if not finished:
         echo("    Rekt: ($1, $2)" % [$maxRectLower, $maxRectSize])
         rects.add((maxRectLower, maxRectSize))
+        indexRects.add((maxRectIndexLower, maxRectIndexSize))
         # remove rect from scene by updating first and next hashmaps
         var indexSizeLst = [maxRectIndexSize[0], maxRectIndexSize[1], maxRectIndexSize[2]]
         var indexLowerLst = [maxRectIndexLower[0], maxRectIndexLower[1], maxRectIndexLower[2]]
@@ -397,4 +399,4 @@ proc rectDecomp*(v: Voxtree): RectDecomp =
   echo("Ray poly intersection test time: $1/$2" % [$v.getRayPolyIntersectionTime(), $totalTime])
   echo("Ray poly intersection test call count: $1" % $v.getRayPolyCallCount())
   echo(rects.len)
-  result = rects
+  result = (rects, indexRects)
